@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Archivo: purchase_invoice_template.xml
+    Propósito: Plantillas QWeb para el reporte de facturas asociado al pedido de compra.
+    Descripción general:
+      - `report_purchase_invoice_custom`: wrapper que recorre los documentos y
+        llama a la plantilla del documento.
+      - `report_purchase_invoice_document`: plantilla principal que muestra el
+        estado de facturación, lista de facturas, pagos y totales.
+    Nota: Los comentarios añadidos describen cada bloque y no modifican la lógica.
+-->
+<odoo>
+    <!--
+        Plantilla wrapper:
+        - Recorre `docs` y llama a la plantilla del documento para cada registro.
+        - Conserva el idioma del partner pasando `t-lang`.
+    -->
+    <template id="report_purchase_invoice_custom">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="test_report.report_purchase_invoice_document" t-lang="o.partner_id.lang"/>
+            </t>
+        </t>
+    </template>
+
+    <!--
+        Plantilla principal del documento de factura asociado al pedido de compra.
+        - Usa `web.external_layout` para mantener el layout exterior del reporte.
+        - Establece `o` con el contexto del idioma del partner.
+    -->
+    <template id="report_purchase_invoice_document">
+        <t t-call="web.external_layout">
+            <t t-set="o" t-value="o.with_context(lang=o.partner_id.lang)"/>
+            
+            <div class="page">
+                <!-- Estructura base: marcador para edición visual -->
+                <div class="oe_structure"/>
+
+                <!--
+                    Encabezados según estado del pedido:
+                    - Muestra distintos títulos según `o.state`.
+                -->
+                <div class="mt-4">
+                    <h2 t-if="o.state in ['draft', 'sent', 'to approve']">Solicitud de Presupuesto <span t-field="o.name"/></h2>
+                    <h2 t-if="o.state in ['purchase', 'done']">Orden de Compra <span t-field="o.name"/></h2>
+                    <h2 t-if="o.state == 'cancel'">Orden Cancelada <span t-field="o.name"/></h2>
+                    <h4 class="text-muted">Informe de Estado de Facturación</h4>
+                </div>
+
+                <!--
+                    Bloque de información principal del pedido:
+                    - Proveedor, referencia del pedido y fecha del pedido.
+                    - `t-field` con opciones para mostrar contacto correctamente.
+                -->
+                <div id="informations" class="row mt32 mb32">
+                    <div class="col-3 bm-2">
+                        <strong>Proveedor:</strong>
+                        <div t-field="o.partner_id" 
+                             t-options='{"widget": "contact", "fields": ["name", "phone"], "no_marker": True, "phone_icons": True}'/>
+                    </div>
+                    <div class="col-3 bm-2">
+                        <strong>Referencia Pedido:</strong>
+                        <p t-field="o.partner_ref" class="m-0"/>
+                    </div>
+                    <div class="col-3 bm-2">
+                        <strong>Fecha Pedido:</strong>
+                        <p t-field="o.date_order" class="m-0"/>
+                    </div>
+                </div>
+
+                <!--
+                    Mensaje cuando no existen facturas relacionadas:
+                    - Se muestra una alerta explicativa.
+                -->
+                <div t-if="not o.invoice_ids" class="alert alert-warning mt-4 text-center" role="alert" style="border-radius: 10px;">
+                    <h4>Estado: La factura todavía no se ha generado</h4>
+                    <p>Este pedido de compra aún no tiene facturas de proveedor asociadas.</p>
+                </div>
+
+                <!--
+                    Tabla de facturas: se muestra cuando `o.invoice_ids` no está vacío.
+                    Columnas: factura, fecha, estado/pagos, total y saldo pendiente.
+                -->
+                <div t-else="" class="mt-4">
+                    <table class="table table-sm o_main_table" style="border: 1px solid #dee2e6; border-radius: 15px; border-collapse: separate; border-spacing: 0; overflow: hidden;">
+                        <thead style="background-color: #f8f9fa;">
+                            <tr>
+                                <th name="th_inv_name" class="pl-3"><strong>Factura</strong></th>
+                                <th name="th_inv_date"><strong>Fecha</strong></th>
+                                <th name="th_inv_status"><strong>Estado y Pagos</strong></th>
+                                <th name="th_inv_amount" class="text-right"><strong>Total</strong></th>
+                                <th name="th_inv_residual" class="text-right pr-3"><strong>Saldo Pendiente</strong></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Bucle: recorre todas las facturas relacionadas al pedido -->
+                            <tr t-foreach="o.invoice_ids" t-as="invoice">
+                                <td class="pl-3">
+                                    <span t-field="invoice.name" class="font-weight-bold"/>
+                                </td>
+                                
+                                <td>
+                                    <span t-field="invoice.invoice_date"/>
+                                </td>
+                                
+                                <td>
+                                    <!--
+                                        Muestra badges según `invoice.state` y `invoice.payment_state`:
+                                        - Cancelada, Borrador, Pagado, Pago parcial, Sin pagar, Reversada
+                                    -->
+                                    <t t-if="invoice.state == 'cancel'">
+                                        <span class="badge badge-danger text-uppercase" style="border-radius: 10px; padding: 5px 10px;">Cancelada</span>
+                                    </t>
+                                    
+                                    <t t-elif="invoice.state == 'draft'">
+                                        <span class="badge badge-light text-uppercase" style="border: 1px solid #ccc; border-radius: 10px; padding: 5px 10px;">Borrador</span>
+                                    </t>
+                                    
+                                    <t t-elif="invoice.state == 'posted'">
+                                        <t t-if="invoice.payment_state == 'paid'">
+                                            <span class="badge badge-success text-uppercase" style="border-radius: 10px; padding: 5px 10px;">Pagado</span>
+                                        </t>
+                                        
+                                        <t t-elif="invoice.payment_state == 'partial'">
+                                            <span class="badge badge-warning text-uppercase" style="border-radius: 10px; padding: 5px 10px;">Pagado en cuotas</span>
+                                        </t>
+                                        
+                                        <t t-elif="invoice.payment_state == 'not_paid'">
+                                            <span class="badge badge-danger text-uppercase" style="border-radius: 10px; padding: 5px 10px;">Sin Pagar</span>
+                                        </t>
+                                        
+                                        <t t-elif="invoice.payment_state == 'reversed'">
+                                            <span class="badge badge-secondary text-uppercase" style="border-radius: 10px; padding: 5px 10px;">Reversada</span>
+                                        </t>
+                                    </t>
+                                </td>
+
+                                <!-- Monto total de la factura -->
+                                <td class="text-end">
+                                    <span t-field="invoice.amount_total"
+                                          t-options='{"widget": "monetary", "display_currency": invoice.currency_id}'/>
+                                </td>
+
+                                <!-- Saldo pendiente: se muestra solo si la factura está publicada y no pagada -->
+                                <td class="text-end pr-3">
+                                    <t t-if="invoice.state == 'posted' and invoice.payment_state != 'paid'">
+                                        <span t-field="invoice.amount_residual" 
+                                              t-options='{"widget": "monetary", "display_currency": invoice.currency_id}'
+                                              class="font-weight-bold text-danger"/>
+                                    </t>
+                                    <t t-else="">
+                                        <span class="text-muted">-</span>
+                                    </t>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!--
+                    Sección de detalles adicionales y totales:
+                    - Historial de pagos: se muestra si hay pagos en alguna factura.
+                    - Totales: total facturado y saldo pendiente total.
+                -->
+                <div class="clearfix" t-if="o.invoice_ids">
+                    <div id="total" class="row">
+                        <div class="col-7">
+                            <!-- Bucle anidado: por cada factura iterar sus pagos -->
+                            <div t-if="any(inv.payment_state in ('paid', 'partial') for inv in o.invoice_ids)" class="mt-3">
+                                <strong class="text-muted">Historial de Pagos Realizados:</strong>
+                                <table class="table table-sm table-borderless mt-1" style="font-size: 0.9em; width: 100%; border: 1px solid #eee; border-radius: 10px; padding: 5px;">
+                                    <t t-foreach="o.invoice_ids" t-as="invoice">
+                                        <t t-foreach="invoice.payment_ids" t-as="payment">
+                                            <tr>
+                                                <td class="pl-2"><i class="fa fa-caret-right"/> <span t-field="payment.date"/></td>
+                                                <td><span t-field="payment.name"/></td>
+                                                <td class="text-right pr-2">
+                                                    <span t-field="payment.amount" t-options='{"widget": "monetary", "display_currency": invoice.currency_id}'/>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </t>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Tabla de totales: suma de amounts y residuales de facturas -->
+                        <div class="col-5">
+                            <table class="table table-sm" style="page-break-inside: avoid; border: 1px solid #000; border-radius: 10px; border-collapse: separate; border-spacing: 0; overflow: hidden;">
+                                <tr class="o_subtotal">
+                                    <td class="pl-3"><strong>Total Facturado</strong></td>
+                                    <td class="text-right pr-3">
+                                        <span t-esc="sum(o.invoice_ids.mapped('amount_total'))" 
+                                              t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                    </td>
+                                </tr>
+                                <tr class="o_total">
+                                    <td class="pl-3"><strong>Saldo Pendiente Total</strong></td>
+                                    <td class="text-end pr-3">
+                                        <span t-esc="sum(o.invoice_ids.mapped('amount_residual'))" 
+                                              t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Marcador final de estructura -->
+                <div class="oe_structure"/>
+            </div>
+        </t>
+    </template>
+</odoo>

@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Plantilla heredada: se hereda de 'purchase.report_purchaseorder_document'
+        para añadir información adicional en el informe de Pedido de Compra.
+    -->
+    <template id="report_purchaseorder_document_inherit" inherit_id="purchase.report_purchaseorder_document">
+        <!--
+            Añadir variable temporal 'invoice_info' al contexto de la plantilla.
+            - 'status_info' contiene un texto con el estado de la(s) factura(s).
+            - 'payment_info' contiene un texto con información de pago.
+            Se usa <t t-set="invoice_info" .../> para calcular y reusar estos
+            valores en varias partes del informe.
+        -->
+        <xpath expr="//t[@t-set='o']" position="before">
+            <t t-set="invoice_info" t-value="{
+                'status_info': o.invoice_status_info,
+                'payment_info': o.invoice_payment_info
+            }"/>
+        </xpath>
+        
+        <!--
+            Inserta un bloque en la columna derecha (antes de la última columna de la primera fila)
+            que muestra una sección resumida 'Información de Factura' si existen datos.
+            - Usa 't-if' para mostrar solo si hay 'status_info' o 'payment_info'.
+        -->
+        <xpath expr="//div[hasclass('row')][1]/div[last()]" position="before">
+            <div class="col-4" t-if="invoice_info['status_info'] or invoice_info['payment_info']">
+                <strong>Información de Factura:</strong>
+                <p t-if="invoice_info['status_info']" class="mb-1">
+                    <strong>Estado:</strong> 
+                    <span t-esc="invoice_info['status_info']"/>
+                </p>
+                <p t-if="invoice_info['payment_info']" class="mb-0">
+                    <strong>Pago:</strong> 
+                    <span t-esc="invoice_info['payment_info']"/>
+                </p>
+            </div>
+        </xpath>  
+        <!--
+            Dentro de la página del informe se insertan dos secciones principales:
+            1) Detalle de Facturas: tabla con información relevante por factura.
+            2) Detalle de Pagos: tabla con los pagos asociados a las facturas.
+        -->
+        <xpath expr="//div[hasclass('page')]" position="inside">
+            <!--
+                Sección: Detalle de Facturas
+                - Se muestra solo si el pedido tiene facturas relacionadas: 'o.invoice_ids'.
+                - La tabla lista: número, fechas, estado, estado de pago, monto total y saldo.
+            -->
+            <div class="row mt-4" t-if="o.invoice_ids">
+                <div class="col-12">
+                    <h4>Detalle de Facturas</h4>
+                    <table class="table table-bordered" style="border-radius: 15px; border-collapse: separate; border-spacing: 0; overflow: hidden;">
+                        <thead>
+                            <tr>
+                                <th>Número Factura</th>
+                                <!--<th>Fecha</th>-->
+                                <!--<th>Fecha Vencimiento</th>-->
+                                <th>Estado</th>
+                                <th>Estado de Pago</th>
+                                <th class="text-center">Monto Total</th>
+                                <th class="text-right">Saldo Pendiente</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!--
+                                Loop: recorrer cada factura en 'o.invoice_ids'.
+                                - 'invoice' es la variable local para cada iteración.
+                            -->
+                            <tr t-foreach="o.invoice_ids" t-as="invoice">
+                                <td>
+                                    <span t-esc="invoice.name"/>
+                                </td>
+                                <!--<td>
+                                    <span t-esc="invoice.invoice_date"/>
+                                </td>
+                                <td>
+                                    <span t-esc="invoice.invoice_date_due"/>
+                                </td>-->
+                                <td>
+                                    <!--
+                                        Mostrar una etiqueta (badge) según 'invoice.state'.
+                                        - 'posted' => Publicada
+                                        - 'cancel' => Cancelada
+                                        - 'draft' => Borrador
+                                    -->
+                                    <t t-if="invoice.state == 'posted'">
+                                        <span class="badge badge-success" style="border-radius: 10px;">Publicada</span>
+                                    </t>
+                                    <t t-elif="invoice.state == 'cancel'">
+                                        <span class="badge badge-danger" style="border-radius: 10px;">Cancelada</span>
+                                    </t>
+                                    <t t-elif="invoice.state == 'draft'">
+                                        <span class="badge badge-secondary" style="border-radius: 10px;">Borrador</span>
+                                    </t>
+                                </td>
+                                <td>
+                                    <!--
+                                        Mostrar estado de pago usando 'invoice.payment_state'.
+                                        - 'paid', 'partial', 'not_paid', 'reversed' y otros.
+                                    -->
+                                    <t t-if="invoice.payment_state == 'paid'">
+                                        <span class="badge badge-success" style="border-radius: 10px;">Pagada</span>
+                                    </t>
+                                    <t t-elif="invoice.payment_state == 'partial'">
+                                        <span class="badge badge-warning" style="border-radius: 10px;">Pago Parcial</span>
+                                    </t>
+                                    <t t-elif="invoice.payment_state == 'not_paid'">
+                                        <span class="badge badge-danger" style="border-radius: 10px;">Pendiente</span>
+                                    </t>
+                                    <t t-elif="invoice.payment_state == 'reversed'">
+                                        <span class="badge badge-info" style="border-radius: 10px;">Reversada</span>
+                                    </t>
+                                    <t t-else="">
+                                        <span t-esc="invoice.payment_state"/>
+                                    </t>
+                                </td>
+                                
+                                <!-- Monto total y saldo pendiente (formateados como moneda) -->
+                                <td class="text-center">
+                                    <span t-field="invoice.amount_total" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                </td>
+                                
+                                <td class="text-center">
+                                    <span t-field="invoice.amount_residual" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!--
+                Sección: Detalle de Pagos
+                - Se muestra si existen facturas y al menos un pago asociado a alguna de ellas.
+                - La tabla itera facturas y luego sus pagos para listar cada registro.
+            -->
+            <div class="row mt-2" t-if="o.invoice_ids and any(inv.payment_ids for inv in o.invoice_ids)">
+                <div class="col-12">
+                    <h5>Detalle de Pagos</h5>
+                    <table class="table table-sm table-bordered" style="border-radius: 10px; border-collapse: separate; border-spacing: 0; overflow: hidden;">
+                        <thead>
+                            <tr>
+                                <th>Factura</th>
+                                <th>Fecha Pago</th>
+                                <th>Método de Pago</th>
+                                <th class="text-right">Monto</th>
+                                <th>Referencia</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!--
+                                Bucle anidado:
+                                - Por cada 'invoice' en 'o.invoice_ids' recorre 'invoice.payment_ids'.
+                                - 'payment' contiene la información del pago (fecha, monto, método).
+                            -->
+                            <t t-foreach="o.invoice_ids" t-as="invoice">
+                                <t t-foreach="invoice.payment_ids" t-as="payment">
+                                    <tr>
+                                        <td><span t-esc="invoice.name"/></td>
+                                        <td><span t-esc="payment.date"/></td>
+                                        <td><span t-esc="payment.payment_method_line_id.name"/></td>
+                                        <td class="text-end">
+                                            <span t-field="payment.amount" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                        </td>
+                                        <td><span t-esc="payment.ref"/></td>
+                                    </tr>
+                                </t>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </xpath>
+    </template>
+</odoo>
