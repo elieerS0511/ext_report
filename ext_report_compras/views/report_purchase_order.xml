@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_purchaseorder_document_inherit" inherit_id="purchase.report_purchaseorder_document">
+        
+        <xpath expr="//t[@t-set='o']" position="before">
+            <t t-set="invoice_info" t-value="{
+                'status_info': o.invoice_status_info,
+                'payment_info': o.invoice_payment_info
+            }"/>
+        </xpath>
+        
+        <xpath expr="//div[hasclass('row')][1]/div[last()]" position="before">
+            <div class="col-4" t-if="invoice_info['status_info'] or invoice_info['payment_info']">
+                <strong>Información de Factura:</strong>
+                <p t-if="invoice_info['status_info']" class="mb-1">
+                    <strong>Estado:</strong> 
+                    <span t-esc="invoice_info['status_info']"/>
+                </p>
+                <p t-if="invoice_info['payment_info']" class="mb-0">
+                    <strong>Pago:</strong> 
+                    <span t-esc="invoice_info['payment_info']"/>
+                </p>
+            </div>
+        </xpath>
+        
+        <xpath expr="//div[hasclass('page')]" position="inside">
+            
+            <div class="row mt-4" t-if="o.invoice_ids">
+                <div class="col-12">
+                    <h4>Detalle de Facturas</h4>
+                    <table class="table table-bordered" style="border-radius: 15px; border-collapse: separate; border-spacing: 0; overflow: hidden;">
+                        <thead>
+                            <tr>
+                                <th>Número Factura</th>
+                                <th>Fecha</th>
+                                <th>Fecha Vencimiento</th>
+                                <th>Estado</th>
+                                <th>Estado de Pago</th>
+                                <th class="text-right">Monto Total</th>
+                                <th class="text-right">Saldo Pendiente</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="o.invoice_ids" t-as="invoice">
+                                <td>
+                                    <span t-esc="invoice.name"/>
+                                </td>
+                                <td>
+                                    <span t-esc="invoice.invoice_date"/>
+                                </td>
+                                <td>
+                                    <span t-esc="invoice.invoice_date_due"/>
+                                </td>
+                                <td>
+                                    <t t-if="invoice.state == 'posted'">
+                                        <span class="badge badge-success" style="border-radius: 10px;">Publicada</span>
+                                    </t>
+                                    <t t-elif="invoice.state == 'cancel'">
+                                        <span class="badge badge-danger" style="border-radius: 10px;">Cancelada</span>
+                                    </t>
+                                    <t t-elif="invoice.state == 'draft'">
+                                        <span class="badge badge-secondary" style="border-radius: 10px;">Borrador</span>
+                                    </t>
+                                </td>
+                                <td>
+                                    <t t-if="invoice.payment_state == 'paid'">
+                                        <span class="badge badge-success" style="border-radius: 10px;">Pagada</span>
+                                    </t>
+                                    <t t-elif="invoice.payment_state == 'partial'">
+                                        <span class="badge badge-warning" style="border-radius: 10px;">Pago Parcial</span>
+                                    </t>
+                                    <t t-elif="invoice.payment_state == 'not_paid'">
+                                        <span class="badge badge-danger" style="border-radius: 10px;">Pendiente</span>
+                                    </t>
+                                    <t t-elif="invoice.payment_state == 'reversed'">
+                                        <span class="badge badge-info" style="border-radius: 10px;">Reversada</span>
+                                    </t>
+                                    <t t-else="">
+                                        <span t-esc="invoice.payment_state"/>
+                                    </t>
+                                </td>
+                                
+                                <td class="text-end">
+                                    <span t-field="invoice.amount_total" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                </td>
+                                
+                                <td class="text-end">
+                                    <span t-field="invoice.amount_residual" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="row mt-2" t-if="o.invoice_ids and any(inv.payment_ids for inv in o.invoice_ids)">
+                <div class="col-12">
+                    <h5>Detalle de Pagos</h5>
+                    <table class="table table-sm table-bordered" style="border-radius: 10px; border-collapse: separate; border-spacing: 0; overflow: hidden;">
+                        <thead>
+                            <tr>
+                                <th>Factura</th>
+                                <th>Fecha Pago</th>
+                                <th>Método de Pago</th>
+                                <th class="text-right">Monto</th>
+                                <th>Referencia</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="o.invoice_ids" t-as="invoice">
+                                <t t-foreach="invoice.payment_ids" t-as="payment">
+                                    <tr>
+                                        <td><span t-esc="invoice.name"/></td>
+                                        <td><span t-esc="payment.date"/></td>
+                                        <td><span t-esc="payment.payment_method_line_id.name"/></td>
+                                        <td class="text-end">
+                                            <span t-field="payment.amount" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                        </td>
+                                        <td><span t-esc="payment.ref"/></td>
+                                    </tr>
+                                </t>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </xpath>
+    </template>
+</odoo>

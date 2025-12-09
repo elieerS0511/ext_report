@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_purchaseorder_document_inherit_simple" inherit_id="purchase.report_purchaseorder_document">
+        
+        <!-- Agregar sección de facturas después de la información de la orden -->
+        <xpath expr="//div[contains(@class, 'informations') or contains(@class, 'row')][1]" position="after">
+            <!-- Resumen de estado de facturas -->
+            <div class="row mt-3" t-if="o.invoice_status_info or o.invoice_payment_info">
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        <strong><i class="fa fa-file-invoice"></i> Estado de Facturas:</strong>
+                        <span t-field="o.invoice_status_info"/>
+                        <br/>
+                        <strong><i class="fa fa-money-bill"></i> Estado de Pagos:</strong>
+                        <span t-field="o.invoice_payment_info"/>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabla de facturas -->
+            <div class="row mt-3" t-if="o.invoice_ids">
+                <div class="col-12">
+                    <h5>Facturas Relacionadas</h5>
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Número</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th>Pago</th>
+                                <th>Total</th>
+                                <th>Saldo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="o.invoice_ids" t-as="inv">
+                                <td><span t-field="inv.name"/></td>
+                                <td><span t-field="inv.invoice_date"/></td>
+                                <td>
+                                    <t t-if="inv.state == 'posted'">✓ Publicada</t>
+                                    <t t-elif="inv.state == 'cancel'">✗ Cancelada</t>
+                                    <t t-else><span t-field="inv.state"/></t>
+                                </td>
+                                <td>
+                                    <t t-if="inv.payment_state == 'paid'">✓ Pagada</t>
+                                    <t t-elif="inv.payment_state == 'partial'">⇆ En Cuotas</t>
+                                    <t t-elif="inv.payment_state == 'not_paid'">⏱ Pendiente</t>
+                                    <t t-else><span t-field="inv.payment_state"/></t>
+                                </td>
+                                <td class="text-right"><span t-field="inv.amount_total"/></td>
+                                <td class="text-right"><span t-field="inv.amount_residual"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </xpath>
+    </template>
+</odoo>
